@@ -19,6 +19,7 @@ except ImportError:
     print('File {0} was missing and thus created. Please maintain your credentials.\nSee {0}.example for an example.'.format(secf))
     sys.exit(1)
 
+
 class Result(object):
     """ Class representing an academic record. """
 
@@ -32,7 +33,9 @@ class Result(object):
     def __str__(self):
         if self.passed:
             return '{:<14}{:<40} > {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
-        else: return 'Not yet passed: {}'.format(self.exam)
+        else:
+            return 'Not yet passed: {}'.format(self.exam)
+
 
 class RecordHandler(object):
     """ Class for handling different functions regarding grades and exams. """
@@ -51,6 +54,7 @@ class RecordHandler(object):
 
     def print_exams(self):
         print(*self.results, sep='\n')
+
 
 class Crawler(object):
     """ Class for crawling the information. """
@@ -83,9 +87,9 @@ class Crawler(object):
             'submit': 'Login'
         }
         self.session.post(Crawler.CAS_URL, data=payload, cookies=response.cookies)
-    
+
     def parse_results(self):
-        """ Navigate to 'Academic Records' and parse the results. """    
+        """ Navigate to 'Academic Records' and parse the results. """
         params = {
             'state': 'user',
             'type': '8',
@@ -105,7 +109,7 @@ class Crawler(object):
 
         elements = [tag.getText().strip() for tag in soup.find_all('th', {'class': 'Konto'})]
         no_elems = len(elements)
-        
+
         def group(lst, n):
             """ Group given lst into tuples of size n. """
             for i in range(0, len(lst), n):
@@ -124,15 +128,15 @@ class Crawler(object):
             passed = grade_lst[elements.index('Status')]
             results.append(Result(semester, exam, grade, ects, passed))
         return results
-    
+
     def strip(self, tag):
         """ Strip the tag and remove \xa0 """
         return unicodedata.normalize("NFKD", tag.getText().strip())
-    
+
     def parse_ects(self, ectss):
-        """ This is ugly but ECTS are decoded like this: 
-            <!-- document.write(Math.round(2.0*10)/10); //--> """
-        return ectss.split('.')[2][-1]
+        """ This is ugly but ECTS are decoded like this: (Example with 12 ECTS)
+            <!-- document.write(Math.round(12.0*10)/10); //--> """
+        return ectss.split('(')[2].split('.')[0]
 
 if __name__ == '__main__':
-    Crawler().run()    
+    Crawler().run()
