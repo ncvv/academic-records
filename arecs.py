@@ -37,8 +37,17 @@ class Result(object):
             return 'Not yet passed: {}'.format(self.exam)
 
 
+class Student(object):
+
+    def __init__(self):
+        self.name = ''
+
+
 class RecordHandler(object):
     """ Class for handling different functions regarding grades and exams. """
+
+    MSC_ECTS = 120
+    BSC_ECTS = 180
 
     def __init__(self, results):
         self.results = results
