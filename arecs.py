@@ -16,7 +16,7 @@ except ImportError:
     secf = 'secrets.py'
     with open(secf, 'w') as f:
         f.write('USER = \'\'\nPASSWORD = \'\'')
-    print('File {0} was missing and thus created. Please maintain your credentials.\nSee {0}.example for an example.'.format(secf))
+    print('File {0} was missing and thus created. Please maintain your credentials.'.format(secf))
     sys.exit(1)
 
 
@@ -68,8 +68,9 @@ class RecordHandler(object):
 class Crawler(object):
     """ Class for crawling the information. """
 
-    CAS_URL = 'https://cas.uni-mannheim.de/cas/login?service=https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1'
     QIS_URL = 'https://portal.uni-mannheim.de/qisserver/rds?'
+    CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
+               'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
 
     def __init__(self):
         self.session = requests.Session()
@@ -79,6 +80,7 @@ class Crawler(object):
         self.login()
         results = self.parse_results()
         rec_handler = RecordHandler(results)
+        # Print results
         gpa_str = 'Your GPA is: {0:.2f}'.format(rec_handler.calc_gpa())
         print('{}\n{}'.format(gpa_str, '-' * len(gpa_str)))
         rec_handler.print_exams()
@@ -110,7 +112,8 @@ class Crawler(object):
             soup_portal = BeautifulSoup(response.text, 'html.parser')
             res_link = soup_portal.find('a', href=True, text='Notenspiegel')['href']
         except TypeError as te:
-            print('{}\n\nA {} occurred while trying to access the website.\nMake sure your credentials are properly maintained.'.format(te, te.__class__.__name__))
+            print(('{}\n\nA {} occurred while trying to access the website.\n'
+                   'Make sure your credentials are properly maintained.').format(te, te.__class__.__name__))
             sys.exit(1)
 
         response = self.session.get(res_link)
@@ -119,14 +122,8 @@ class Crawler(object):
         elements = [tag.getText().strip() for tag in soup.find_all('th', {'class': 'Konto'})]
         no_elems = len(elements)
 
-        def group(lst, n):
-            """ Group given lst into tuples of size n. """
-            for i in range(0, len(lst), n):
-                values = lst[i:i+n]
-                yield tuple(values)
-
         raw_results = [self.strip(tag) for tag in soup.find_all('td', {'class': 'posrecords'})]
-        res_tuples = list(group(raw_results, no_elems))
+        res_tuples = list(self.group(raw_results, no_elems))
         results = []
         for tup in res_tuples:
             grade_lst = list(tup)
@@ -137,6 +134,12 @@ class Crawler(object):
             passed = grade_lst[elements.index('Status')]
             results.append(Result(semester, exam, grade, ects, passed))
         return results
+
+    def group(self, lst, n):
+        """ Group given lst into tuples of size n. """
+        for i in range(0, len(lst), n):
+            values = lst[i:i + n]
+            yield tuple(values)
 
     def strip(self, tag):
         """ Strip the tag and remove \xa0 """
