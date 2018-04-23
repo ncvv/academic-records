@@ -1,23 +1,33 @@
 """ Module for obtaining information on Academic Records. """
-import os
+# import os
 import re
 import sys
+import getpass
 import unicodedata
 
+import click
 import requests
 from bs4 import BeautifulSoup
 
-try:
-    from secrets import USER, PASSWORD
-    if not USER or not PASSWORD:
-        print('Please maintain your credentials.')
-        sys.exit(1)
-except ImportError:
+
+def cred_input():
+    username = input('Username: ')
+    password = getpass.getpass('Password: ')
     secf = 'secrets.py'
     with open(secf, 'w') as f:
-        f.write('USER = \'\'\nPASSWORD = \'\'')
-    print('File {0} was missing and thus created. Please maintain your credentials.'.format(secf))
-    sys.exit(1)
+        f.write('USERNAME = \'{}\'\nPASSWORD = \'{}\'\n'.format(username, password))
+    print('User credentials are now maintained in {0}.\n'.format(secf))
+    # sys.exit(1)
+
+
+try:
+    from secrets import USERNAME, PASSWORD
+    if not USERNAME or not PASSWORD:
+        print('Please maintain your credentials.')
+        cred_input()
+except ImportError:
+    cred_input()
+    from secrets import USERNAME, PASSWORD
 
 
 class Result(object):
@@ -32,7 +42,7 @@ class Result(object):
 
     def __str__(self):
         if self.passed:
-            return '{:<14}{:<40} > {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
+            return '{:<14}{:<40} = {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
         else:
             return 'Not yet passed: {}'.format(self.exam)
 
@@ -90,7 +100,7 @@ class Crawler(object):
         response = self.session.get(Crawler.CAS_URL)
         lt = re.findall('(LT-.*?)\"', response.text)[0]
         payload = {
-            'username': USER,
+            'username': USERNAME,
             'password': PASSWORD,
             'lt': lt,
             'execution': 'e1s1',
@@ -113,7 +123,7 @@ class Crawler(object):
             res_link = soup_portal.find('a', href=True, text='Notenspiegel')['href']
         except TypeError as te:
             print(('{}\n\nA {} occurred while trying to access the website.\n'
-                   'Make sure your credentials are properly maintained.').format(te, te.__class__.__name__))
+                   'Make sure your credentials are correctly maintained.').format(te, te.__class__.__name__))
             sys.exit(1)
 
         response = self.session.get(res_link)
@@ -149,6 +159,13 @@ class Crawler(object):
         """ This is ugly but ECTS are decoded like this: (Example with 12 ECTS)
             <!-- document.write(Math.round(12.0*10)/10); //--> """
         return ectss.split('(')[2].split('.')[0]
+
+
+@click.command()
+def main():
+    click.echo('Run!')
+    print('Second')
+
 
 if __name__ == '__main__':
     Crawler().run()

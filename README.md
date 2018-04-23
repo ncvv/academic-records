@@ -33,7 +33,7 @@ $ pipenv install
 You may now maintain your Uni Mannheim credentials in a file called `secrets.py` in order to access the server. You can create it yourself or run the program and it will create the file for you and you just have to fill in your credentials. The file should have the following format:
 
 ```
-USER='youruser'
+USERNAME='youruser'
 PASSWORD='yourpw'
 ```
 
