@@ -55,6 +55,14 @@ Finally, if you have maintained your credentials, you can calculate your current
 $ prp arecs.py
 ```
 
+Sample Output:
+
+Your GPA is: 1.56
+-----------------
+HWS 16/17     Economics I                              = 1.0 (2 ECTS)
+HWS 16/17     Data Mining                              = 1.3 (6 ECTS)
+HWS 16/17     The Science of Life                      = 2.0 (6 ECTS)
+
 ## Running the Tests
 
 How to run the tests
