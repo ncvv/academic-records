@@ -42,7 +42,7 @@ class Result(object):
 
     def __str__(self):
         if self.passed:
-            return '{:<14}{:<40} > {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
+            return '{:<14}{:<40} = {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
         else:
             return 'Not yet passed: {}'.format(self.exam)
 
@@ -168,5 +168,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-    # Crawler().run()
+    Crawler().run()
