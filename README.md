@@ -57,6 +57,7 @@ $ prp arecs.py
 
 Sample Output:
 
+```
 Hi Max (1234543)!
 Degree: Business Informatics
 Semester: 2
@@ -67,6 +68,7 @@ Your GPA is: 1.67
 FSS 18       1.3   6 ECTS   CS 123 Machine Learning
 FSS 18       1.7   6 ECTS   IE 234 Information Systems
 FSS 18       2.0   6 ECTS   CS 443 Database Systems II
+```
 
 ## Running the Tests
 
