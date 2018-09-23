@@ -5,7 +5,6 @@ import sys
 import getpass
 import unicodedata
 
-import click
 import requests
 from bs4 import BeautifulSoup
 
@@ -42,25 +41,40 @@ class Result(object):
 
     def __str__(self):
         if self.passed:
-            return '{:<14}{:<40} = {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
+            return '{:<13}{}{:>4} ECTS   {}'.format(self.semester, self.grade, self.ects, self.exam)
         else:
             return 'Not yet passed: {}'.format(self.exam)
 
 
 class Student(object):
 
-    def __init__(self):
-        self.name = ''
+    def __init__(self, name, matnr, degree, semester):
+        self.name = name
+        self.matnr = matnr
+        self.degree = degree
+        self.semester = semester
+        self.gpa = 0.0
+        self.sum_ects = 0
+        self.missing_ects = 0
+
+    def __str__(self):
+        dashes = '-' * len('Your GPA is: {:.2f}'.format(self.gpa))
+        return ('Hi {} ({})!\n'
+                'Degree: \033[1m{}\033[0m\n'
+                'Semester: \033[1m{}\033[0m\n'
+                'You have reached \033[1m{}\033[0m ECTS so far.\n\n'
+                'Your GPA is: \033[1m{:.2f}\033[0m\n{}').format(self.name, self.matnr, self.degree, self.semester, self.sum_ects, self.gpa, dashes)
 
 
 class RecordHandler(object):
-    """ Class for handling different functions regarding grades and exams. """
+    """ Class for handling different functions regarding grades and exams for a particular student. """
 
     MSC_ECTS = 120
     BSC_ECTS = 180
 
-    def __init__(self, results):
+    def __init__(self, results, student):
         self.results = results
+        self.student = student
 
     def calc_gpa(self):
         sum_ects = 0
@@ -69,9 +83,12 @@ class RecordHandler(object):
             if res.passed:
                 sum_grade += res.grade * res.ects
                 sum_ects += res.ects
-        return float(sum_grade / sum_ects)
+        self.student.sum_ects = sum_ects
+        self.student.gpa = float(sum_grade / sum_ects)
 
     def print_exams(self):
+        print()
+        print(self.student)
         print(*self.results, sep='\n')
 
 
@@ -88,11 +105,9 @@ class Crawler(object):
     def run(self):
         """ Main entry point. """
         self.login()
-        results = self.parse_results()
-        rec_handler = RecordHandler(results)
-        # Print results
-        gpa_str = 'Your GPA is: {0:.2f}'.format(rec_handler.calc_gpa())
-        print('{}\n{}'.format(gpa_str, '-' * len(gpa_str)))
+        results, student = self.parse_results()
+        rec_handler = RecordHandler(results, student)
+        rec_handler.calc_gpa()
         rec_handler.print_exams()
 
     def login(self):
@@ -118,6 +133,7 @@ class Crawler(object):
             'breadCrumbSource': 'portal'
         }
         response = self.session.get(Crawler.QIS_URL, params=params)
+
         try:
             soup_portal = BeautifulSoup(response.text, 'html.parser')
             res_link = soup_portal.find('a', href=True, text='Notenspiegel')['href']
@@ -128,6 +144,10 @@ class Crawler(object):
 
         response = self.session.get(res_link)
         soup = BeautifulSoup(response.text, 'html.parser')
+
+        s_info = [tag.getText().strip() for tag in soup.find_all('span', {'class': 'nobr'})]
+        name, matnr, degree, semester = s_info[1], s_info[3], s_info[5], s_info[7]
+        student = Student(name, matnr, degree, semester)
 
         elements = [tag.getText().strip() for tag in soup.find_all('th', {'class': 'Konto'})]
         no_elems = len(elements)
@@ -143,7 +163,7 @@ class Crawler(object):
             ects = int(self.parse_ects(grade_lst[elements.index('ECTS')]))
             passed = grade_lst[elements.index('Status')]
             results.append(Result(semester, exam, grade, ects, passed))
-        return results
+        return results, student
 
     def group(self, lst, n):
         """ Group given lst into tuples of size n. """
@@ -159,12 +179,6 @@ class Crawler(object):
         """ This is ugly but ECTS are decoded like this: (Example with 12 ECTS)
             <!-- document.write(Math.round(12.0*10)/10); //--> """
         return ectss.split('(')[2].split('.')[0]
-
-
-@click.command()
-def main():
-    click.echo('Run!')
-    print('Second')
 
 
 if __name__ == '__main__':
