@@ -33,7 +33,7 @@ $ pipenv install
 You may now maintain your Uni Mannheim credentials in a file called `secrets.py` in order to access the server. You can create it yourself or run the program and it will create the file for you and you just have to fill in your credentials. The file should have the following format:
 
 ```
-USER='youruser'
+USERNAME='youruser'
 PASSWORD='yourpw'
 ```
 
@@ -54,6 +54,19 @@ Finally, if you have maintained your credentials, you can calculate your current
 ```
 $ prp arecs.py
 ```
+
+Sample Output:
+
+Hi Max (1234543)!
+Degree: Business Informatics
+Semester: 2
+You have reached 18 ECTS so far.
+
+Your GPA is: 1.67
+-----------------
+FSS 18       1.3   6 ECTS   CS 123 Machine Learning
+FSS 18       1.7   6 ECTS   IE 234 Information Systems
+FSS 18       2.0   6 ECTS   CS 443 Database Systems II
 
 ## Running the Tests
 

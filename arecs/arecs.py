@@ -1,23 +1,32 @@
 """ Module for obtaining information on Academic Records. """
-import os
+# import os
 import re
 import sys
+import getpass
 import unicodedata
 
 import requests
 from bs4 import BeautifulSoup
 
-try:
-    from secrets import USER, PASSWORD
-    if not USER or not PASSWORD:
-        print('Please maintain your credentials.')
-        sys.exit(1)
-except ImportError:
+
+def cred_input():
+    username = input('Username: ')
+    password = getpass.getpass('Password: ')
     secf = 'secrets.py'
     with open(secf, 'w') as f:
-        f.write('USER = \'\'\nPASSWORD = \'\'')
-    print('File {0} was missing and thus created. Please maintain your credentials.\nSee {0}.example for an example.'.format(secf))
-    sys.exit(1)
+        f.write('USERNAME = \'{}\'\nPASSWORD = \'{}\'\n'.format(username, password))
+    print('User credentials are now maintained in {0}.\n'.format(secf))
+    # sys.exit(1)
+
+
+try:
+    from secrets import USERNAME, PASSWORD
+    if not USERNAME or not PASSWORD:
+        print('Please maintain your credentials.')
+        cred_input()
+except ImportError:
+    cred_input()
+    from secrets import USERNAME, PASSWORD
 
 
 class Result(object):
@@ -32,16 +41,40 @@ class Result(object):
 
     def __str__(self):
         if self.passed:
-            return '{:<14}{:<40} > {:>} ({} ECTS)'.format(self.semester, self.exam, self.grade, self.ects)
+            return '{:<13}{}{:>4} ECTS   {}'.format(self.semester, self.grade, self.ects, self.exam)
         else:
             return 'Not yet passed: {}'.format(self.exam)
 
 
-class RecordHandler(object):
-    """ Class for handling different functions regarding grades and exams. """
+class Student(object):
 
-    def __init__(self, results):
+    def __init__(self, name, matnr, degree, semester):
+        self.name = name
+        self.matnr = matnr
+        self.degree = degree
+        self.semester = semester
+        self.gpa = 0.0
+        self.sum_ects = 0
+        self.missing_ects = 0
+
+    def __str__(self):
+        dashes = '-' * len('Your GPA is: {:.2f}'.format(self.gpa))
+        return ('Hi {} ({})!\n'
+                'Degree: \033[1m{}\033[0m\n'
+                'Semester: \033[1m{}\033[0m\n'
+                'You have reached \033[1m{}\033[0m ECTS so far.\n\n'
+                'Your GPA is: \033[1m{:.2f}\033[0m\n{}').format(self.name, self.matnr, self.degree, self.semester, self.sum_ects, self.gpa, dashes)
+
+
+class RecordHandler(object):
+    """ Class for handling different functions regarding grades and exams for a particular student. """
+
+    MSC_ECTS = 120
+    BSC_ECTS = 180
+
+    def __init__(self, results, student):
         self.results = results
+        self.student = student
 
     def calc_gpa(self):
         sum_ects = 0
@@ -50,17 +83,21 @@ class RecordHandler(object):
             if res.passed:
                 sum_grade += res.grade * res.ects
                 sum_ects += res.ects
-        return float(sum_grade / sum_ects)
+        self.student.sum_ects = sum_ects
+        self.student.gpa = float(sum_grade / sum_ects)
 
     def print_exams(self):
+        print()
+        print(self.student)
         print(*self.results, sep='\n')
 
 
 class Crawler(object):
     """ Class for crawling the information. """
 
-    CAS_URL = 'https://cas.uni-mannheim.de/cas/login?service=https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1'
     QIS_URL = 'https://portal.uni-mannheim.de/qisserver/rds?'
+    CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
+               'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
 
     def __init__(self):
         self.session = requests.Session()
@@ -68,10 +105,9 @@ class Crawler(object):
     def run(self):
         """ Main entry point. """
         self.login()
-        results = self.parse_results()
-        rec_handler = RecordHandler(results)
-        gpa_str = 'Your GPA is: {0:.2f}'.format(rec_handler.calc_gpa())
-        print('{}\n{}'.format(gpa_str, '-' * len(gpa_str)))
+        results, student = self.parse_results()
+        rec_handler = RecordHandler(results, student)
+        rec_handler.calc_gpa()
         rec_handler.print_exams()
 
     def login(self):
@@ -79,7 +115,7 @@ class Crawler(object):
         response = self.session.get(Crawler.CAS_URL)
         lt = re.findall('(LT-.*?)\"', response.text)[0]
         payload = {
-            'username': USER,
+            'username': USERNAME,
             'password': PASSWORD,
             'lt': lt,
             'execution': 'e1s1',
@@ -97,27 +133,27 @@ class Crawler(object):
             'breadCrumbSource': 'portal'
         }
         response = self.session.get(Crawler.QIS_URL, params=params)
+
         try:
             soup_portal = BeautifulSoup(response.text, 'html.parser')
             res_link = soup_portal.find('a', href=True, text='Notenspiegel')['href']
         except TypeError as te:
-            print('{}\n\nA {} occurred while trying to access the website.\nMake sure your credentials are properly maintained.'.format(te, te.__class__.__name__))
+            print(('{}\n\nA {} occurred while trying to access the website.\n'
+                   'Make sure your credentials are correctly maintained.').format(te, te.__class__.__name__))
             sys.exit(1)
 
         response = self.session.get(res_link)
         soup = BeautifulSoup(response.text, 'html.parser')
 
+        s_info = [tag.getText().strip() for tag in soup.find_all('span', {'class': 'nobr'})]
+        name, matnr, degree, semester = s_info[1], s_info[3], s_info[5], s_info[7]
+        student = Student(name, matnr, degree, semester)
+
         elements = [tag.getText().strip() for tag in soup.find_all('th', {'class': 'Konto'})]
         no_elems = len(elements)
 
-        def group(lst, n):
-            """ Group given lst into tuples of size n. """
-            for i in range(0, len(lst), n):
-                values = lst[i:i+n]
-                yield tuple(values)
-
         raw_results = [self.strip(tag) for tag in soup.find_all('td', {'class': 'posrecords'})]
-        res_tuples = list(group(raw_results, no_elems))
+        res_tuples = list(self.group(raw_results, no_elems))
         results = []
         for tup in res_tuples:
             grade_lst = list(tup)
@@ -127,7 +163,13 @@ class Crawler(object):
             ects = int(self.parse_ects(grade_lst[elements.index('ECTS')]))
             passed = grade_lst[elements.index('Status')]
             results.append(Result(semester, exam, grade, ects, passed))
-        return results
+        return results, student
+
+    def group(self, lst, n):
+        """ Group given lst into tuples of size n. """
+        for i in range(0, len(lst), n):
+            values = lst[i:i + n]
+            yield tuple(values)
 
     def strip(self, tag):
         """ Strip the tag and remove \xa0 """
@@ -137,6 +179,7 @@ class Crawler(object):
         """ This is ugly but ECTS are decoded like this: (Example with 12 ECTS)
             <!-- document.write(Math.round(12.0*10)/10); //--> """
         return ectss.split('(')[2].split('.')[0]
+
 
 if __name__ == '__main__':
     Crawler().run()
