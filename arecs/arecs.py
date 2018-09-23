@@ -15,7 +15,7 @@ def cred_input():
     secf = 'secrets.py'
     with open(secf, 'w') as f:
         f.write('USERNAME = \'{}\'\nPASSWORD = \'{}\'\n'.format(username, password))
-    print('User credentials are now maintained in {0}.\n'.format(secf))
+    print('User credentials are now maintained in {0}.'.format(secf))
     # sys.exit(1)
 
 
