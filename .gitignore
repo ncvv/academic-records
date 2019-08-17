@@ -3,6 +3,7 @@
 
 # Python
 __pycache__/
+.pytest_cache/
 .pyc
 
 # VSCode
@@ -10,4 +11,5 @@ __pycache__/
 
 # Project
 secrets.py
-sample.html
+.results
+tests/test_page.html

@@ -8,6 +8,12 @@ url = "https://pypi.python.org/simple"
 requests = "*"
 click = "*"
 "flake8" = "*"
+pytest = "*"
+pyyaml = "*"
+yapf = "*"
 
 [requires]
 python_version = "3.5"
+
+[dev-packages]
+yapf = "*"
