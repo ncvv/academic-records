@@ -5,6 +5,7 @@ import re
 import sys
 import getpass
 import unicodedata
+import smtplib
 
 import pickle
 import click
@@ -69,9 +70,22 @@ class Student(object):
 
 class RecordHandler(object):
     """Class for handling different functions regarding grades and exams for a particular student."""
-    def __init__(self, results, student):
+    def __init__(self, results, student, new):
         self.results = results
         self.student = student
+        self.new = new
+
+    def __str__(self):
+        s = str(self.student)
+        # No difference compared to last run, simply print results
+        if self.new is None:
+            s += '\n'.join(map(str, self.results))
+        # Highlight new records that have not been crawled in the last run
+        else:
+            for res in self.results:
+                if res in self.new:
+                    s += '\033[1m\033[31m{}\033[0m'.format(res)  # red
+        return s
 
     def calc_gpa(self):
         sum_ects = 0
@@ -83,19 +97,6 @@ class RecordHandler(object):
         self.student.sum_ects = sum_ects
         self.student.gpa = float(sum_grade / sum_ects)
 
-    def print_exams(self, new=None):
-        print()
-        print(self.student)
-        # No difference compared to last run, simply print results
-        if new is None:
-            print(*self.results, sep='\n')
-        # Highlight new records that have not been crawled in the last run
-        else:
-            for r in self.results:
-                if r in new:
-                    r = '\033[1m\033[31m{}\033[0m'.format(r)  # red
-                print(r)
-
 
 class Crawler(object):
     """Class for crawling the information."""
@@ -103,12 +104,14 @@ class Crawler(object):
     CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
                'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
 
-    RESULT_FILE = '.results'
+    RESULT_FILE = '../.results'
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, mail, mail_password):
         self.session = requests.Session()
         self.username = username
         self.password = password
+        self.mail = mail
+        self.mali_password = mail_password
 
     def run(self):
         """Main entry point."""
@@ -117,9 +120,13 @@ class Crawler(object):
         results, student = self.parse_results(html)
         new = self.diff(results)
 
-        rec_handler = RecordHandler(results, student)
+        rec_handler = RecordHandler(results, student, new)
         rec_handler.calc_gpa()
-        rec_handler.print_exams(new)
+        print()
+        print(rec_handler)
+        #if self.mail and new is not None and len(new) > 0:
+        x = 0 if new is None else len(new)
+        self.send_mail(str(rec_handler), x)
 
     def login(self):
         """Initialize session by logging in."""
@@ -170,7 +177,9 @@ class Crawler(object):
         elements = [tag.getText().strip() for tag in soup.find_all('th', {'class': 'Konto'})]
         no_elems = len(elements)
 
-        raw_results = [strip_unicode(tag.getText()) for tag in soup.find_all('td', {'class': 'posrecords'})]
+        raw_results = [
+            strip_unicode(tag.getText()) for tag in soup.find_all('td', {'class': 'posrecords'})
+        ]
         res_tuples = list(group(raw_results, no_elems))
         results = []
         for tup in res_tuples:
@@ -199,6 +208,14 @@ class Crawler(object):
         with open(Crawler.RESULT_FILE, 'wb') as fp:
             pickle.dump(results, fp)
 
+    def send_mail(self, msg, newlen):
+        """Send an email with content msg via GMail."""
+        message = 'Subject: {}\n\n{}'.format('You have {} new grade(s).'.format(newlen), msg)
+        server = smtplib.SMTP_SSL('smtp.web.de', 587)
+        server.login(self.mail, self.mail_password)
+        server.sendmail(self.mail, self.mail, message)
+        server.quit()
+
 
 def group(lst, n):
     """Group given lst into tuples of size n."""
@@ -219,22 +236,42 @@ def parse_ects(ectsstr):
 
 
 @click.command()
-@click.option('--store', '-s', is_flag=True, help="Store credentials (in plaintext).")
-def cli(store):
+@click.option('--store',
+              '-s',
+              is_flag=True,
+              help="Store credentials (in plaintext)."
+              " Can also be used to overwrite stored information.")
+@click.option('--mail',
+              '-m',
+              is_flag=True,
+              help="Send an email in case there are new records."
+              " Requires gmail, gmail password and less secure apps enabled on Google.")
+def cli(store, mail):
+    cred_ok = False
+    MAIL = ''
+    MAIL_PASSWORD = ''
     try:
         from secrets import USERNAME, PASSWORD
+        cred_ok = True
+        if mail:
+            from secrets import MAIL, MAIL_PASSWORD
         if store:
             raise ImportError  # pretend nothing was stored in order to overwrite
     except ImportError:
-        USERNAME = input('Username: ')
-        PASSWORD = getpass.getpass('Password: ')
+        if not cred_ok:
+            USERNAME = input('Username: ')
+            PASSWORD = getpass.getpass('Password: ')
+        MAIL = input('GMail: ') if mail else ''
+        MAIL_PASSWORD = getpass.getpass('Mail Password: ') if mail else ''
     if store:
         secfile = 'secrets.py'
         with open(secfile, 'w') as f:
-            f.write('USERNAME = \'{}\'\n' 'PASSWORD = \'{}\'\n'.format(USERNAME, PASSWORD))
+            f.write('USERNAME = \'{}\'\nPASSWORD = \'{}\'\n'.format(USERNAME, PASSWORD))
+            if mail:
+                f.write('MAIL = \'{}\'\nMAIL_PASSWORD = \'{}\'\n'.format(MAIL, MAIL_PASSWORD))
         print('Your credentials are stored in {} (as plaintext).'.format(secfile))
 
-    crawler = Crawler(USERNAME, PASSWORD)
+    crawler = Crawler(USERNAME, PASSWORD, MAIL, MAIL_PASSWORD)
     try:
         crawler.run()
     except KeyboardInterrupt:
