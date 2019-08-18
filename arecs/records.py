@@ -81,6 +81,7 @@ class RecordHandler(object):
         if self.new is None:
             rhstr += '\n'
             rhstr += '\n'.join(map(str, self.results))
+
         # Highlight new records that have not been crawled in the last run
         else:
             for res in self.results:
@@ -94,10 +95,12 @@ class RecordHandler(object):
            by taking the average of the (ects) weighted exam results"""
         sum_ects = 0
         sum_grade = 0
+        
         for res in self.results:
             if res.passed:
                 sum_grade += res.grade * res.ects
                 sum_ects += res.ects
+        
         self.student.sum_ects = sum_ects
         self.student.gpa = float(sum_grade / sum_ects)
 
@@ -108,7 +111,7 @@ class Crawler(object):
     CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
                'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
 
-    RESULT_FILE = 'arecs/.results'
+    RESULT_FILE = '.results'
 
     def __init__(self, username, password, mail_req):
         self.session = requests.Session()
@@ -122,23 +125,27 @@ class Crawler(object):
         self.login()
         html = self.get_source()
         results, student = self.parse_results(html)
+
+        # Determine difference to last runs results
+        # in order to be able to send a mail when new records are online
         new = self.diff(results)
 
         rec_handler = RecordHandler(results, student, new)
         rec_handler.calc_gpa()
+        
         print()
         print(rec_handler)
+        # Send mail if there is a new record
         if self.mail_req and new is not None and len(new) > 0:
             self.send_mail(new, len(new))
 
     def login(self):
         """Initialize session by logging in."""
         response = self.session.get(Crawler.CAS_URL)
-        lt = re.findall('(LT-.*?)\"', response.text)[0]
         payload = {
             'username': self.username,
             'password': self.password,
-            'lt': lt,
+            'lt': re.findall('(LT-.*?)\"', response.text)[0],
             'execution': 'e1s1',
             '_eventId': 'submit',
             'submit': 'Login'
@@ -209,6 +216,7 @@ class Crawler(object):
                 s = set(old_results)
                 new = [r for r in results if r not in s]
                 return new
+
         else:
             # Serialize
             with open(Crawler.RESULT_FILE, 'wb') as fp:
@@ -237,6 +245,7 @@ class Crawler(object):
         recs_new = '\n'.join(map(str, new_lst))
         message += '\n{}\n'.format(recs_new)
 
+        # Send email
         server = smtplib.SMTP('smtp.mail.uni-mannheim.de', 587)
         server.starttls()
         server.login(self.mail, self.password)
