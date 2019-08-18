@@ -2,50 +2,38 @@
 
 A simple command line tool for retrieving your **a**cademic **rec**ord**s** from the University of Mannheim.
 
-## Getting Started
+## Running the Program
 
 These instructions will help you run the program.
-
-### Prerequisites
-
-What you need and how to install the prerequisites required for running the program. 
-
-#### Pipenv
-
 You need to have pipenv installed.
-
 ```bash
-pip3 install pipenv
+$ pip3 install pipenv
 ```
 
-### Installing & Running
-
 Create a virtual environment and install the dependencies with pipenv:
-
 ```bash
 $ pipenv install
 ```
 
 To run the main program, you have to execute the script from within the `arecs/` folder in the repository:
-
 ```bash
 $ cd arecs/
 $ pipenv run python records.py
 ```
 
-Enter your credentials in order to access the server. With command line option `-s` your credentials will be stored (in plaintext) so you don't have to enter them again. Run `--help` for more info on command line options.
+Enter your credentials in order to authenticate. With command line option `-s` your credentials will be stored (in plaintext) so you don't have to enter them again next time. Option `-m` will send an email to your university mail account if there are new records - this only works after the program has been run at least once. Run `--help` for more info on command line options.
 
-```bash
+```
 $ pipenv run python records.py --help
 Usage: records.py [OPTIONS]
 
 Options:
-  -s, --store  Store credentials (in plaintext).
+  -s, --store  Store credentials (in plaintext). Can also be used to overwrite stored information.
+  -m, --mail   Send an email if there are new records.
   --help       Show this message and exit.
 ```
 
 The program will output your current GPA and display exam information.
-
 Sample Output:
 
 ```
@@ -80,3 +68,7 @@ $ py.test
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+### Disclaimer
+
+**Use this tool responsibly and at your own risk**. For example run it once a week with a cronjob on your RaspberryPi, but **do not** spam the university's servers by executing the program too frequently (which won't be beneficial anyways since your GPA doesn't change every other minute.). You are responsible for all consequences of your behavior. 
