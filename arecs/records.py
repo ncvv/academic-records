@@ -38,8 +38,7 @@ class Result(object):
 
     def __str__(self):
         if self.passed:
-            return '{:<13}{}{:>4} ECTS   {}'.format(self.semester, self.grade, self.ects,
-                                                    self.exam)
+            return '{:<13}{}{:>4} ECTS   {}'.format(self.semester, self.grade, self.ects, self.exam)
         else:
             return 'Not yet passed: ' + self.exam
 
@@ -80,6 +79,7 @@ class RecordHandler(object):
         rhstr = str(self.student)
         # No difference compared to last run, simply print results
         if self.new is None:
+            rhstr += '\n'
             rhstr += '\n'.join(map(str, self.results))
         # Highlight new records that have not been crawled in the last run
         else:
@@ -110,12 +110,12 @@ class Crawler(object):
 
     RESULT_FILE = 'arecs/.results'
 
-    def __init__(self, username, password, mail, mail_password):
+    def __init__(self, username, password, mail_req):
         self.session = requests.Session()
         self.username = username
         self.password = password
-        self.mail = mail
-        self.mail_password = mail_password
+        self.mail = username + '@mail.uni-mannheim.de'
+        self.mail_req = mail_req
 
     def run(self):
         """Main entry point."""
@@ -128,7 +128,7 @@ class Crawler(object):
         rec_handler.calc_gpa()
         print()
         print(rec_handler)
-        if self.mail and new is not None and len(new) > 0:
+        if self.mail_req and new is not None and len(new) > 0:
             self.send_mail(new, len(new))
 
     def login(self):
@@ -181,7 +181,8 @@ class Crawler(object):
         no_elems = len(elements)
 
         raw_results = [
-            unicodedata.normalize("NFKD", tag.getText().strip()) for tag in soup.find_all('td', {'class': 'posrecords'})
+            unicodedata.normalize("NFKD", tag.getText().strip())
+            for tag in soup.find_all('td', {'class': 'posrecords'})
         ]
         res_tuples = list(group(raw_results, no_elems))
         results = []
@@ -238,7 +239,7 @@ class Crawler(object):
 
         server = smtplib.SMTP('smtp.mail.uni-mannheim.de', 587)
         server.starttls()
-        server.login(self.mail, self.mail_password)
+        server.login(self.mail, self.password)
         server.sendmail(self.mail, self.mail, message)
         server.quit()
 
@@ -265,35 +266,22 @@ def parse_ects(ectsstr):
 @click.option('--mail',
               '-m',
               is_flag=True,
-              help="Send an email if there are new records."
-              " Requires UniMA mail and password.")
+              help="Send an email if there are new records.")
 def cli(store, mail):
-    cred_ok = False
     try:
         from secrets import USERNAME, PASSWORD
-        cred_ok = True
-        if mail:
-            from secrets import MAIL, MAIL_PASSWORD
-        else:
-            MAIL = ''
-            MAIL_PASSWORD = ''
         if store:
             raise ImportError  # pretend nothing was stored in order to overwrite
     except ImportError:
-        if not cred_ok:
-            USERNAME = input('Username: ')
-            PASSWORD = getpass.getpass('Password: ')
-        MAIL = input('Mail (UniMA): ') if mail else ''
-        MAIL_PASSWORD = getpass.getpass('Mail Password: ') if mail else ''
+        USERNAME = input('Username: ')
+        PASSWORD = getpass.getpass('Password: ')
     if store:
         secfile = 'secrets.py'
         with open(secfile, 'w') as f:
             f.write('USERNAME = \'{}\'\nPASSWORD = \'{}\'\n'.format(USERNAME, PASSWORD))
-            if mail:
-                f.write('MAIL = \'{}\'\nMAIL_PASSWORD = \'{}\'\n'.format(MAIL, MAIL_PASSWORD))
         print('Your credentials are stored in {} (as plaintext).'.format(secfile))
 
-    crawler = Crawler(USERNAME, PASSWORD, MAIL, MAIL_PASSWORD)
+    crawler = Crawler(USERNAME, PASSWORD, mail)
     try:
         crawler.run()
     except KeyboardInterrupt:
