@@ -5,6 +5,7 @@ A simple command line tool for retrieving your **a**cademic **rec**ord**s** from
 ## Running the Program
 
 These instructions will help you run the program.
+
 You need to have pipenv installed.
 ```bash
 $ pip3 install pipenv
@@ -21,7 +22,9 @@ $ cd arecs/
 $ pipenv run python records.py
 ```
 
-Enter your credentials in order to authenticate. With command line option `-s` your credentials will be stored (in plaintext) so you don't have to enter them again next time. Option `-m` will send an email to your university mail account if there are new records - this only works after the program has been run at least once. Run `--help` for more info on command line options.
+Enter your credentials in order to authenticate. With command line option `-s` your credentials will be stored (in plaintext) so you don't have to enter them again next time. Option `-m` will send an email to your university mail account if there are new records - this only works if the program has been executed at least once.
+
+Run `--help` for more info on command line options.
 
 ```
 $ pipenv run python records.py --help
@@ -34,7 +37,8 @@ Options:
 ```
 
 The program will output your current GPA and display exam information.
-Sample Output:
+
+A sample output looks like this:
 
 ```
 Hi Max (1234543)!
