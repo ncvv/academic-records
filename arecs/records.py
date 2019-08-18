@@ -6,6 +6,7 @@ import sys
 import getpass
 import unicodedata
 import smtplib
+from datetime import datetime
 
 import pickle
 import click
@@ -76,18 +77,21 @@ class RecordHandler(object):
         self.new = new
 
     def __str__(self):
-        s = str(self.student)
+        rhstr = str(self.student)
         # No difference compared to last run, simply print results
         if self.new is None:
-            s += '\n'.join(map(str, self.results))
+            rhstr += '\n'.join(map(str, self.results))
         # Highlight new records that have not been crawled in the last run
         else:
             for res in self.results:
                 if res in self.new:
-                    s += '\033[1m\033[31m{}\033[0m'.format(res)  # red
-        return s
+                    res = '\033[1m\033[31m{}\033[0m'.format(res)  # red
+                rhstr += '\n' + str(res)
+        return rhstr
 
     def calc_gpa(self):
+        """Calculate the gpa of this student
+           by taking the average of the (ects) weighted exam results"""
         sum_ects = 0
         sum_grade = 0
         for res in self.results:
@@ -104,14 +108,14 @@ class Crawler(object):
     CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
                'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
 
-    RESULT_FILE = '../.results'
+    RESULT_FILE = 'arecs/.results'
 
     def __init__(self, username, password, mail, mail_password):
         self.session = requests.Session()
         self.username = username
         self.password = password
         self.mail = mail
-        self.mali_password = mail_password
+        self.mail_password = mail_password
 
     def run(self):
         """Main entry point."""
@@ -124,9 +128,8 @@ class Crawler(object):
         rec_handler.calc_gpa()
         print()
         print(rec_handler)
-        #if self.mail and new is not None and len(new) > 0:
-        x = 0 if new is None else len(new)
-        self.send_mail(str(rec_handler), x)
+        if self.mail and new is not None and len(new) > 0:
+            self.send_mail(new, len(new))
 
     def login(self):
         """Initialize session by logging in."""
@@ -178,7 +181,7 @@ class Crawler(object):
         no_elems = len(elements)
 
         raw_results = [
-            strip_unicode(tag.getText()) for tag in soup.find_all('td', {'class': 'posrecords'})
+            unicodedata.normalize("NFKD", tag.getText().strip()) for tag in soup.find_all('td', {'class': 'posrecords'})
         ]
         res_tuples = list(group(raw_results, no_elems))
         results = []
@@ -201,17 +204,40 @@ class Crawler(object):
                 old_results = pickle.load(fp)
             if len(old_results) == len(results):
                 return None
-            s = set(old_results)
-            new = [r for r in results if r not in s]
-            return new
-        # Serialize
-        with open(Crawler.RESULT_FILE, 'wb') as fp:
-            pickle.dump(results, fp)
+            else:
+                s = set(old_results)
+                new = [r for r in results if r not in s]
+                return new
+        else:
+            # Serialize
+            with open(Crawler.RESULT_FILE, 'wb') as fp:
+                pickle.dump(results, fp)
+            return None
 
-    def send_mail(self, msg, newlen):
-        """Send an email with content msg via GMail."""
-        message = 'Subject: {}\n\n{}'.format('You have {} new grade(s).'.format(newlen), msg)
-        server = smtplib.SMTP_SSL('smtp.web.de', 587)
+    def send_mail(self, new_lst, newlen):
+        """Send an email via Uni Mannheim smtp server.
+           Content of the mail in new_lst is every
+           new academic record since last run of the program."""
+        # Mail headers
+        headers = {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Content-Disposition': 'inline',
+            'Content-Transfer-Encoding': '8bit',
+            'From': self.mail,
+            'To': self.mail,
+            'Date': datetime.now().strftime('%a, %d %b %Y  %H:%M:%S %Z'),
+            'Subject': 'You have {} new grade(s).'.format(newlen)
+        }
+
+        # Mail content
+        message = ''
+        for h, v in headers.items():
+            message += '{}: {}\n'.format(h, v)
+        recs_new = '\n'.join(map(str, new_lst))
+        message += '\n{}\n'.format(recs_new)
+
+        server = smtplib.SMTP('smtp.mail.uni-mannheim.de', 587)
+        server.starttls()
         server.login(self.mail, self.mail_password)
         server.sendmail(self.mail, self.mail, message)
         server.quit()
@@ -222,11 +248,6 @@ def group(lst, n):
     for i in range(0, len(lst), n):
         values = lst[i:i + n]
         yield tuple(values)
-
-
-def strip_unicode(tag):
-    """Strip the given tag and remove unicode elements."""
-    return unicodedata.normalize("NFKD", tag.strip())
 
 
 def parse_ects(ectsstr):
@@ -244,24 +265,25 @@ def parse_ects(ectsstr):
 @click.option('--mail',
               '-m',
               is_flag=True,
-              help="Send an email in case there are new records."
-              " Requires gmail, gmail password and less secure apps enabled on Google.")
+              help="Send an email if there are new records."
+              " Requires UniMA mail and password.")
 def cli(store, mail):
     cred_ok = False
-    MAIL = ''
-    MAIL_PASSWORD = ''
     try:
         from secrets import USERNAME, PASSWORD
         cred_ok = True
         if mail:
             from secrets import MAIL, MAIL_PASSWORD
+        else:
+            MAIL = ''
+            MAIL_PASSWORD = ''
         if store:
             raise ImportError  # pretend nothing was stored in order to overwrite
     except ImportError:
         if not cred_ok:
             USERNAME = input('Username: ')
             PASSWORD = getpass.getpass('Password: ')
-        MAIL = input('GMail: ') if mail else ''
+        MAIL = input('Mail (UniMA): ') if mail else ''
         MAIL_PASSWORD = getpass.getpass('Mail Password: ') if mail else ''
     if store:
         secfile = 'secrets.py'

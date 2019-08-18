@@ -1,12 +1,8 @@
-from arecs.records import group, strip_unicode, parse_ects
+from arecs.records import group, parse_ects
 
 
 def test_parse_ects():
     assert (int(parse_ects('<!-- document.write(Math.round(12.0*10)/10); //-->'))) == 12
-
-
-def test_strip_unicode():
-    assert (strip_unicode('410630\xa0')) == '410630'
 
 
 def test_group():
