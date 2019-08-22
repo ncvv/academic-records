@@ -233,7 +233,7 @@ class Crawler(object):
             'From': self.mail,
             'To': self.mail,
             'Date': datetime.now().strftime('%a, %d %b %Y  %H:%M:%S %Z'),
-            'Subject': 'You have {} new grade(s).'.format(newlen)
+            'Subject': 'Portal@UniMa: You have {} new grade(s).'.format(newlen)
         }
 
         # Mail content
