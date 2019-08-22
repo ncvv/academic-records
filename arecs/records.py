@@ -64,8 +64,8 @@ class Student(object):
                 'Semester: \033[1m{}\033[0m\n'
                 'You have reached \033[1m{}\033[0m ECTS so far.\n\n'
                 'Your GPA is: \033[1m{:.2f}\033[0m\n{}').format(self.name, self.matnr, self.degree,
-                                                                self.semester, self.sum_ects,
-                                                                self.gpa, dashes)
+                                                                self.semester, self.sum_ects, self.gpa,
+                                                                dashes)
 
 
 class RecordHandler(object):
@@ -95,12 +95,12 @@ class RecordHandler(object):
            by taking the average of the (ects) weighted exam results"""
         sum_ects = 0
         sum_grade = 0
-        
+
         for res in self.results:
             if res.passed:
                 sum_grade += res.grade * res.ects
                 sum_ects += res.ects
-        
+
         self.student.sum_ects = sum_ects
         self.student.gpa = float(sum_grade / sum_ects)
 
@@ -108,8 +108,8 @@ class RecordHandler(object):
 class Crawler(object):
     """Class for crawling the information."""
     QIS_URL = 'https://portal.uni-mannheim.de/qisserver/rds?'
-    CAS_URL = ('https://cas.uni-mannheim.de/cas/login?service='
-               'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1')
+    CAS_URL = 'https://cas.uni-mannheim.de/cas/login?service=' \
+              'https%3A%2F%2Fportal.uni-mannheim.de%2Fqisserver%2Frds%3Fstate%3Duser%26type%3D1'
 
     RESULT_FILE = '.results'
 
@@ -132,7 +132,7 @@ class Crawler(object):
 
         rec_handler = RecordHandler(results, student, new)
         rec_handler.calc_gpa()
-        
+
         print()
         print(rec_handler)
         # Send mail if there is a new record
@@ -167,10 +167,8 @@ class Crawler(object):
             res_link = soup_portal.find('a', href=True, text='Notenspiegel')['href']
         except TypeError as te:
             print(te)
-            print(
-                '\n', te.__class__.__name__,
-                ' occurred while trying to access the website. Make sure you entered correct credentials.'
-            )
+            print('\n', te.__class__.__name__,
+                  ' occurred while trying to access the website. Make sure you entered correct credentials.')
             sys.exit(1)
 
         response = self.session.get(res_link)
